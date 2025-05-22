@@ -2,6 +2,7 @@ package br.com.joellacerda.bookstan.service;
 
 import br.com.joellacerda.bookstan.model.Livro;
 import br.com.joellacerda.bookstan.repository.LivroRepository;
+import br.com.joellacerda.bookstan.exception.RecursoNaoEncontradoException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,53 +37,46 @@ public class LivroService {
         return livroRepository.findAll();
     }
 
-        // Metodo para BUSCAR um livro por ID
-        @Transactional(readOnly = true)
-        public Optional<Livro> buscarLivroPorId(Long id) {
-            // O metodo findById do JpaRepository retorna um Optional,
-            // que é uma forma elegante de lidar com valores que podem ser nulos.
-            return livroRepository.findById(id);
-            // No controller, você tratará o Optional (ex: se presente, retorna o livro; senão, retorna 404 Not Found)
-            // Ou, você pode lançar uma exceção aqui se o livro não for encontrado:
-            // return livroRepository.findById(id)
-            //        .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado com ID: " + id));
+    // Metodo para BUSCAR um livro por ID
+    @Transactional(readOnly = true)
+    public Livro buscarLivroPorId(Long id) {
+        // Tenta buscar o livro. Se não encontrar, lança RecursoNaoEncontradoException.
+        return livroRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado com ID: " + id));
+    }
+
+    // Metodo para ATUALIZAR um livro existente
+    @Transactional
+    public Livro atualizarLivro(Long id, Livro livroDetalhes) {
+        // Primeiro, verifica se o livro existe
+        Livro livroExistente = livroRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado com ID: " + id));
+
+        // Atualiza os campos do livro existente com os detalhes fornecidos
+        livroExistente.setTitulo(livroDetalhes.getTitulo());
+        livroExistente.setAutor(livroDetalhes.getAutor());
+        livroExistente.setGenero(livroDetalhes.getGenero());
+        livroExistente.setAnoPublicacao(livroDetalhes.getAnoPublicacao());
+        livroExistente.setIsbn(livroDetalhes.getIsbn());
+        // Não atualizamos o ID
+
+        return livroRepository.save(livroExistente);
+    }
+
+    // Metodo para DELETAR um livro por ID
+    @Transactional
+    public void deletarLivro(Long id) {
+        // Verifica se o livro existe antes de tentar deletar
+        if (!livroRepository.existsById(id)) {
+            throw new RecursoNaoEncontradoException("Livro não encontrado com ID: " + id + " para exclusão.");
         }
+        livroRepository.deleteById(id);
+    }
 
-        // Metodo para ATUALIZAR um livro existente
-        @Transactional
-        public Livro atualizarLivro(Long id, Livro livroDetalhes) {
-            // Primeiro, verifica se o livro existe
-            Livro livroExistente = livroRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Livro não encontrado com ID: " + id));
-            // (Idealmente, use uma exceção customizada como RecursoNaoEncontradoException)
-
-            // Atualiza os campos do livro existente com os detalhes fornecidos
-            livroExistente.setTitulo(livroDetalhes.getTitulo());
-            livroExistente.setAutor(livroDetalhes.getAutor());
-            livroExistente.setGenero(livroDetalhes.getGenero());
-            livroExistente.setAnoPublicacao(livroDetalhes.getAnoPublicacao());
-            livroExistente.setIsbn(livroDetalhes.getIsbn());
-            // Não atualizamos o ID
-
-            return livroRepository.save(livroExistente);
-        }
-
-        // Metodo para DELETAR um livro por ID
-        @Transactional
-        public void deletarLivro(Long id) {
-            // Verifica se o livro existe antes de tentar deletar
-            if (!livroRepository.existsById(id)) {
-                throw new RuntimeException("Livro não encontrado com ID: " + id + " para exclusão.");
-                // (Idealmente, use uma exceção customizada)
-            }
-            livroRepository.deleteById(id);
-        }
-
-        // --- (Opcional) Métodos de consulta personalizados que você pode adicionar ao Repository e usar aqui ---
-        // Exemplo, se você adicionar `Optional<Livro> findByIsbn(String isbn);` em LivroRepository:
-        //
-        // @Transactional(readOnly = true)
-        // public Optional<Livro> buscarLivroPorIsbn(String isbn) {
-        //     return livroRepository.findByIsbn(isbn);
-        // }
+    // Opcional: Se quiser que buscarLivroPorId lance exceção em vez de retornar Optional para o controller tratar
+    // @Transactional(readOnly = true)
+    // public Livro buscarLivroPorId(Long id) {
+    //     return livroRepository.findById(id)
+    //            .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado com ID: " + id));
+    // }
     }

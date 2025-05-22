@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,7 +25,7 @@ public class LivroController {
     // Endpoint para CRIAR um novo livro
     // HTTP POST para /api/livros
     @PostMapping
-    public ResponseEntity<Livro> criarLivro(/*@Valid*/ @RequestBody Livro livro) {
+    public ResponseEntity<Livro> criarLivro(@Valid @RequestBody Livro livro) {
         // O @RequestBody indica que o objeto Livro virá do corpo da requisição HTTP (JSON)
         // @Valid (após adicionar a dependência de validação) acionaria as validações da entidade
         Livro novoLivro = livroService.criarLivro(livro);
@@ -44,35 +45,23 @@ public class LivroController {
     @GetMapping("/{id}")
     public ResponseEntity<Livro> buscarLivroPorId(@PathVariable Long id) {
         // @PathVariable indica que o 'id' virá da URL (ex: /api/livros/1)
-        Optional<Livro> livroOptional = livroService.buscarLivroPorId(id);
-
-        return livroOptional.map(ResponseEntity::ok) // Se o livro existir, retorna 200 OK com o livro
-                .orElseGet(() -> ResponseEntity.notFound().build()); // Senão, retorna 404 Not Found
+        Livro livro = livroService.buscarLivroPorId(id);
+        return ResponseEntity.ok(livro); // Se o livro existir, retorna 200 OK com o livro
     }
 
     // Endpoint para ATUALIZAR um livro existente
     // HTTP PUT para /api/livros/{id}
     @PutMapping("/{id}")
-    public ResponseEntity<Livro> atualizarLivro(@PathVariable Long id, /*@Valid*/ @RequestBody Livro livroDetalhes) {
-        try {
-            Livro livroAtualizado = livroService.atualizarLivro(id, livroDetalhes);
-            return ResponseEntity.ok(livroAtualizado); // Retorna 200 OK com o livro atualizado
-        } catch (RuntimeException e) { // Idealmente, uma exceção mais específica como RecursoNaoEncontradoException
-            // Se o livro não for encontrado no serviço (ao lançar exceção), retorna 404
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<Livro> atualizarLivro(@PathVariable Long id, @Valid @RequestBody Livro livroDetalhes) {
+        Livro livroAtualizado = livroService.atualizarLivro(id, livroDetalhes);
+        return ResponseEntity.ok(livroAtualizado);
     }
 
     // Endpoint para DELETAR um livro por ID
     // HTTP DELETE para /api/livros/{id}
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarLivro(@PathVariable Long id) {
-        try {
-            livroService.deletarLivro(id);
-            return ResponseEntity.noContent().build(); // Retorna 204 No Content (sucesso, sem corpo na resposta)
-        } catch (RuntimeException e) { // Idealmente, uma exceção mais específica
-            // Se o livro não for encontrado para exclusão, retorna 404
-            return ResponseEntity.notFound().build();
-        }
+        livroService.deletarLivro(id);
+        return ResponseEntity.noContent().build();
     }
 }
