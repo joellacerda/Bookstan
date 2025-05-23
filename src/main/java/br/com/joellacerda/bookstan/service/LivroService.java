@@ -68,7 +68,7 @@ public class LivroService {
     public void deletarLivro(Long id) {
         // Verifica se o livro existe antes de tentar deletar
         if (!livroRepository.existsById(id)) {
-            throw new RecursoNaoEncontradoException("Livro não encontrado com ID: " + id + " para exclusão.");
+            throw new RecursoNaoEncontradoException("Livro não encontrado com ID: " + id);
         }
         livroRepository.deleteById(id);
     }
