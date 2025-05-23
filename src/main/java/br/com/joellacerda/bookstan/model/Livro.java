@@ -35,7 +35,7 @@ public class Livro {
     @Column(name = "ano_publicacao") // JPA: Nome da coluna no banco será "ano_publicacao"
     private Integer anoPublicacao;
 
-    @Pattern(regexp = "^(?:ISBN(?:-13)?:? )?(?=[0-9]{13}$|(?=(?:[0-9]+[- ]){4})[- 0-9]{17}$)97[89][- ]?[0-9]{1,5}[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9]$",
+    @Pattern(regexp = "(ISBN-*(1[03])* *(: )?)*(([0-9Xx][- ]*){13}|([0-9Xx][- ]*){10})",
             message = "Formato de ISBN inválido.")
     @Size(max = 20, message = "ISBN deve ter no máximo 20 caracteres.")
     @Column(unique = true) // JPA: Garante que o valor nesta coluna seja único (opcional para ISBN)
