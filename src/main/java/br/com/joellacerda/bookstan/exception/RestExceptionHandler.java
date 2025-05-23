@@ -20,9 +20,9 @@ import java.util.stream.Collectors;
 public class RestExceptionHandler extends ResponseEntityExceptionHandler {
 
     // Handler para RecursoNaoEncontradoException
-    @ExceptionHandler(RecursoNaoEncontradoException.class)
-    public ResponseEntity<Object> handleRecursoNaoEncontradoException(
-            RecursoNaoEncontradoException ex, WebRequest request) {
+    @ExceptionHandler(LivroNaoEncontradoException.class)
+    public ResponseEntity<Object> handleLivroNaoEncontradoException(
+            LivroNaoEncontradoException ex, WebRequest request) {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now());

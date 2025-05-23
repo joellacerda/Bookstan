@@ -10,7 +10,7 @@ public interface LivroRepository extends JpaRepository<Livro, Long> {
     // save(), findById(), findAll(), deleteById(), etc.
 
     // Você pode adicionar métodos de consulta personalizados aqui, se necessário.
-    // Exemplo (não precisa implementar agora):
+    // Exemplo:
     // List<Livro> findByAutor(String autor);
     // Optional<Livro> findByIsbn(String isbn);
 }

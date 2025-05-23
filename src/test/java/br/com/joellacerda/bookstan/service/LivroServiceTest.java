@@ -1,6 +1,6 @@
 package br.com.joellacerda.bookstan.service;
 
-import br.com.joellacerda.bookstan.exception.RecursoNaoEncontradoException;
+import br.com.joellacerda.bookstan.exception.LivroNaoEncontradoException;
 import br.com.joellacerda.bookstan.model.Livro;
 import br.com.joellacerda.bookstan.repository.LivroRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,8 +70,8 @@ public class LivroServiceTest {
         // Act & Assert
         // Verifica se a exceção RecursoNaoEncontradoException é lançada
         // ao chamar o metodo do serviço com o idInexistente.
-        RecursoNaoEncontradoException exception = assertThrows(
-                RecursoNaoEncontradoException.class,
+        LivroNaoEncontradoException exception = assertThrows(
+                LivroNaoEncontradoException.class,
                 () -> livroService.buscarLivroPorId(idInexistente)
         );
 

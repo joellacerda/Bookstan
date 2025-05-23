@@ -38,6 +38,6 @@ public class Livro {
     @Pattern(regexp = "(ISBN-*(1[03])* *(: )?)*(([0-9Xx][- ]*){13}|([0-9Xx][- ]*){10})",
             message = "Formato de ISBN inválido.")
     @Size(max = 20, message = "ISBN deve ter no máximo 20 caracteres.")
-    @Column(unique = true) // JPA: Garante que o valor nesta coluna seja único (opcional para ISBN)
+    @Column(unique = true) // JPA: Garante que o valor nesta coluna seja único
     private String isbn; // Opcional
 }
