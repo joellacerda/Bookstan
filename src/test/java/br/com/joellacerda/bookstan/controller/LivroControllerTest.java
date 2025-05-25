@@ -1,5 +1,6 @@
 package br.com.joellacerda.bookstan.controller;
 
+import br.com.joellacerda.bookstan.dto.LivroRequestDTO;
 import br.com.joellacerda.bookstan.model.Livro;
 import br.com.joellacerda.bookstan.repository.LivroRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +39,9 @@ public class LivroControllerTest {
     private Livro livroExemplo1;
     private Livro livroExemplo2;
 
+    // Para requisições, usaremos LivroRequestDTO
+    private LivroRequestDTO livroRequestExemplo;
+
     @BeforeEach
     void setUp() {
         // Limpa o repositório antes de cada teste para evitar interferências
@@ -48,54 +52,66 @@ public class LivroControllerTest {
         // Configura alguns livros de exemplo
         livroExemplo1 = new Livro(null, "A Revolução dos Bichos", "George Orwell", "Sátira Política", 1945, "978-8535902776");
         livroExemplo2 = new Livro(null, "1984", "George Orwell", "Distopia", 1949, "978-0451524935");
+
+        // DTO para usar nas requisições POST/PUT
+        livroRequestExemplo = new LivroRequestDTO();
+        livroRequestExemplo.setTitulo("O Hobbit");
+        livroRequestExemplo.setAutor("J.R.R. Tolkien");
+        livroRequestExemplo.setGenero("Fantasia");
+        livroRequestExemplo.setAnoPublicacao(1937);
+        livroRequestExemplo.setIsbn("978-0547928227");
     }
 
     @Test
     @DisplayName("POST /api/livros - Deve criar um novo livro e retornar status 201")
     void criarLivro_quandoDadosValidos_retornaLivroCriadoComStatus201() throws Exception {
         // Arrange
-        String livroJson = objectMapper.writeValueAsString(livroExemplo1);
+        String livroJson = objectMapper.writeValueAsString(livroRequestExemplo);
 
         // Act & Assert
         mockMvc.perform(post("/api/livros")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(livroJson))
-                .andExpect(status().isCreated()) // Verifica o HTTP Status 201 (Created)
-                .andExpect(jsonPath("$.id").exists()) // Verifica se o ID foi gerado
-                .andExpect(jsonPath("$.titulo", is("A Revolução dos Bichos")))
-                .andExpect(jsonPath("$.autor", is("George Orwell")));
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(livroJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists()) // ID existe na resposta (LivroResponseDTO)
+                .andExpect(jsonPath("$.titulo", is(livroRequestExemplo.getTitulo())))
+                .andExpect(jsonPath("$.autor", is(livroRequestExemplo.getAutor())));
     }
 
     @Test
     @DisplayName("POST /api/livros - Deve retornar status 400 quando dados inválidos (título em branco)")
     void criarLivro_quandoTituloEmBranco_retornaStatusBadRequest() throws Exception {
         // Arrange
-        Livro livroInvalido = new Livro(null, "", "Autor Inválido", "Gênero", 2000, "12345INVALIDO");
-        String livroJson = objectMapper.writeValueAsString(livroInvalido);
+        LivroRequestDTO livroInvalidoRequest = new LivroRequestDTO();
+        livroInvalidoRequest.setTitulo(""); // Título inválido
+        livroInvalidoRequest.setAutor("Autor Válido");
+        livroInvalidoRequest.setAnoPublicacao(2000);
+        livroInvalidoRequest.setIsbn("978-0451524936"); // ISBN válido para focar no erro do título
+        // Outros campos válidos para isolar o erro do título
+        livroInvalidoRequest.setGenero("Qualquer");
+
+        String livroJson = objectMapper.writeValueAsString(livroInvalidoRequest);
 
         // Act & Assert
         mockMvc.perform(post("/api/livros")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(livroJson))
-                .andExpect(status().isBadRequest()) // Verifica o HTTP Status 400 (Bad Request)
-                .andExpect(jsonPath("$.messages").isArray()) // Verifica se há uma lista de mensagens de erro
-                .andExpect(jsonPath("$.messages", containsInAnyOrder(
-                        "titulo: O título não pode estar em branco.",
-                        "titulo: O título deve ter entre 2 e 100 caracteres.",
-                        "isbn: Formato de ISBN inválido.")));
-
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(livroJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.messages").isArray())
+                .andExpect(jsonPath("$.messages", hasItem("titulo: O título não pode estar em branco.")))
+                .andExpect(jsonPath("$.messages", hasItem("titulo: O título deve ter entre 2 e 100 caracteres.")));
     }
 
     @Test
     @DisplayName("GET /api/livros/{id} - Deve retornar livro quando ID existente e status 200")
     void buscarLivroPorId_quandoIdExistente_retornaLivroComStatus200() throws Exception {
-        // Arrange: Salva um livro no banco para que ele exista
+        // Arrange: Salva uma entidade no banco
         Livro livroSalvo = livroRepository.save(livroExemplo1);
         Long idExistente = livroSalvo.getId();
 
         // Act & Assert
         mockMvc.perform(get("/api/livros/{id}", idExistente)
-                .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(idExistente.intValue())))
                 .andExpect(jsonPath("$.titulo", is(livroExemplo1.getTitulo())));
@@ -109,7 +125,7 @@ public class LivroControllerTest {
 
         // Act & Assert
         mockMvc.perform(get("/api/livros/{id}", idInexistente)
-                .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message", is("Livro não encontrado com ID: " + idInexistente)));
     }
@@ -123,9 +139,9 @@ public class LivroControllerTest {
 
         // Act & Assert
         mockMvc.perform(get("/api/livros")
-                .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2))) // Verifica se a lista tem 2 livros
+                .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].titulo", is(livroExemplo1.getTitulo())))
                 .andExpect(jsonPath("$[1].titulo", is(livroExemplo2.getTitulo())));
     }
@@ -136,16 +152,24 @@ public class LivroControllerTest {
         // Arrange
         Livro livroSalvo = livroRepository.save(livroExemplo1);
         Long idDoLivroSalvo = livroSalvo.getId();
-        Livro livroAtualizado = new Livro(null, "A Revolução dos Bichos", "George Orwell", "Política", 1945, "978-8535902776");
-        String livroAtualizadoJson = objectMapper.writeValueAsString(livroAtualizado);
+
+        LivroRequestDTO dadosAtualizacao = new LivroRequestDTO();
+        dadosAtualizacao.setTitulo("A Revolução dos Bichos [Editado]");
+        dadosAtualizacao.setAutor(livroSalvo.getAutor());
+        dadosAtualizacao.setGenero("Fábula Política");
+        dadosAtualizacao.setAnoPublicacao(livroSalvo.getAnoPublicacao());
+        dadosAtualizacao.setIsbn(livroSalvo.getIsbn());
+
+        String livroAtualizadoJson = objectMapper.writeValueAsString(dadosAtualizacao);
 
         // Act & Assert
         mockMvc.perform(put("/api/livros/{id}", idDoLivroSalvo)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(livroAtualizadoJson))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(livroAtualizadoJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(idDoLivroSalvo.intValue())))
-                .andExpect(jsonPath("$.genero", is(livroAtualizado.getGenero())));
+                .andExpect(jsonPath("$.titulo", is(dadosAtualizacao.getTitulo())))
+                .andExpect(jsonPath("$.genero", is(dadosAtualizacao.getGenero())));
     }
 
     @Test
@@ -153,13 +177,13 @@ public class LivroControllerTest {
     void atualizarLivro_quandoIdInexistente_retornaStatus404() throws Exception {
         // Arrange
         Long idInexistente = 999L;
-        Livro livroInexistenteAtualizado = new Livro(null, "A Revolução dos Bichos", "George Orwell", "Política", 1945, "978-8535902776");
-        String livroAtualizadoJson = objectMapper.writeValueAsString(livroInexistenteAtualizado);
+        // Usamos o livroRequestExemplo apenas como um corpo de requisição válido
+        String livroAtualizadoJson = objectMapper.writeValueAsString(livroRequestExemplo);
 
         // Act & Assert
         mockMvc.perform(put("/api/livros/{id}", idInexistente)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(livroAtualizadoJson))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(livroAtualizadoJson))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message", is("Livro não encontrado com ID: " + idInexistente)));
     }
@@ -170,13 +194,21 @@ public class LivroControllerTest {
         // Arrange
         Livro livroSalvo = livroRepository.save(livroExemplo1);
         Long idDoLivroSalvo = livroSalvo.getId();
-        Livro livroAtualizado = new Livro(null, "", "George Orwell", "Sátira Política", 1945, "12345INVALIDO");
-        String livroAtualizadoJson = objectMapper.writeValueAsString(livroAtualizado);
+
+        LivroRequestDTO livroInvalidoRequest = new LivroRequestDTO();
+        livroInvalidoRequest.setTitulo(""); // Título inválido
+        livroInvalidoRequest.setAutor("George Orwell");
+        livroInvalidoRequest.setAnoPublicacao(1945);
+        livroInvalidoRequest.setIsbn("12345INVALIDO"); // ISBN inválido
+        livroInvalidoRequest.setGenero("Sátira Política");
+
+
+        String livroAtualizadoJson = objectMapper.writeValueAsString(livroInvalidoRequest);
 
         // Act & Assert
         mockMvc.perform(put("/api/livros/{id}", idDoLivroSalvo)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(livroAtualizadoJson))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(livroAtualizadoJson))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.messages").isArray())
                 .andExpect(jsonPath("$.messages", containsInAnyOrder(
@@ -193,12 +225,11 @@ public class LivroControllerTest {
         Long idDoLivroSalvo = livroSalvo.getId();
 
         // Act & Assert
-        mockMvc.perform(delete("/api/livros/{id}", idDoLivroSalvo)
-                .accept(MediaType.APPLICATION_JSON))
+        mockMvc.perform(delete("/api/livros/{id}", idDoLivroSalvo))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/livros/{id}", idDoLivroSalvo)
-                .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNotFound());
     }
 

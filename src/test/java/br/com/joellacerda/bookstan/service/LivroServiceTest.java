@@ -1,5 +1,7 @@
 package br.com.joellacerda.bookstan.service;
 
+import br.com.joellacerda.bookstan.dto.LivroRequestDTO;
+import br.com.joellacerda.bookstan.dto.LivroResponseDTO;
 import br.com.joellacerda.bookstan.exception.LivroNaoEncontradoException;
 import br.com.joellacerda.bookstan.model.Livro;
 import br.com.joellacerda.bookstan.repository.LivroRepository;
@@ -7,10 +9,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -25,88 +30,213 @@ public class LivroServiceTest {
     @InjectMocks // Cria uma instância de LivroService e injeta os mocks (como livroRepository) nela
     private LivroService livroService;
 
-    private Livro livroValido;
+    private LivroRequestDTO livroRequestDTO;
+    private Livro livroEntidade; // Entidade como seria salva ou recuperada do repo
+    private Livro livroEntidadeComId; // Entidade após ser salva (com ID)
 
     @BeforeEach // Metodo executado antes de cada teste (opcional, útil para setup comum)
     void setUp() {
-        // Configura um objeto Livro padrão para usar nos testes
-        livroValido = new Livro(1L, "O Senhor dos Anéis", "J.R.R. Tolkien", "Fantasia", 1954, "978-8533613379");
+        livroRequestDTO = new LivroRequestDTO();
+        livroRequestDTO.setTitulo("O Hobbit");
+        livroRequestDTO.setAutor("J.R.R. Tolkien");
+        livroRequestDTO.setGenero("Fantasia");
+        livroRequestDTO.setAnoPublicacao(1937);
+        livroRequestDTO.setIsbn("978-0547928227");
+
+        // Entidade como seria mapeada a partir do DTO (sem ID ainda)
+        livroEntidade = new Livro(
+                livroRequestDTO.getTitulo(),
+                livroRequestDTO.getAutor(),
+                livroRequestDTO.getGenero(),
+                livroRequestDTO.getAnoPublicacao(),
+                livroRequestDTO.getIsbn()
+        );
+
+        // Entidade como seria retornada do repo após o save (com ID)
+        livroEntidadeComId = new Livro(
+                1L, // ID simulado
+                livroRequestDTO.getTitulo(),
+                livroRequestDTO.getAutor(),
+                livroRequestDTO.getGenero(),
+                livroRequestDTO.getAnoPublicacao(),
+                livroRequestDTO.getIsbn()
+        );
     }
 
     @Test
-    @DisplayName("Deve retornar Livro quando ID existente é fornecido")
-    void buscarLivroPorId_quandoIdExistente_retornaLivro() {
-        // Arrange (Organizar/Configurar)
+    @DisplayName("Deve criar um livro e retornar LivroResponseDTO")
+    void criarLivro_comLivroRequestDTO_retornaLivroResponseDTO() {
+        // Arrange
+        // Configura o mock do repositório para retornar a entidade com ID quando 'save' for chamado.
+        // Usamos any(Livro.class) porque o ID será nulo na entidade passada para save,
+        // mas o objeto em si terá os outros campos do DTO.
+        when(livroRepository.save(any(Livro.class))).thenReturn(livroEntidadeComId);
+
+        // Act
+        LivroResponseDTO responseDTO = livroService.criarLivro(livroRequestDTO);
+
+        // Assert
+        assertNotNull(responseDTO);
+        assertEquals(livroEntidadeComId.getId(), responseDTO.getId()); // Verifica o ID
+        assertEquals(livroRequestDTO.getTitulo(), responseDTO.getTitulo());
+        assertEquals(livroRequestDTO.getAutor(), responseDTO.getAutor());
+
+        // Opcional: verificar se o objeto Livro correto foi passado para o método save
+        ArgumentCaptor<Livro> livroArgumentCaptor = ArgumentCaptor.forClass(Livro.class);
+        verify(livroRepository).save(livroArgumentCaptor.capture());
+        Livro livroSalvoParaRepo = livroArgumentCaptor.getValue();
+
+        assertNull(livroSalvoParaRepo.getId()); // O ID deve ser nulo antes de salvar
+        assertEquals(livroRequestDTO.getTitulo(), livroSalvoParaRepo.getTitulo());
+    }
+
+    @Test
+    @DisplayName("Deve retornar LivroResponseDTO quando ID existente é fornecido")
+    void buscarLivroPorId_quandoIdExistente_retornaLivroResponseDTO() {
+        // Arrange
         Long idExistente = 1L;
-        // Configura o mock do repositório: quando findById com idExistente for chamado,
-        // retorne um Optional contendo o livroValido.
-        when(livroRepository.findById(idExistente)).thenReturn(Optional.of(livroValido));
+        // O repositório retorna a entidade com ID
+        when(livroRepository.findById(idExistente)).thenReturn(Optional.of(livroEntidadeComId));
 
-        // Act (Agir/Executar)
-        // Chama o metodo do serviço que queremos testar
-        Livro livroEncontrado = livroService.buscarLivroPorId(idExistente);
+        // Act
+        LivroResponseDTO responseDTO = livroService.buscarLivroPorId(idExistente);
 
-        // Assert (Verificar)
-        // Verifica se o livro retornado não é nulo e se os atributos são os esperados
-        assertNotNull(livroEncontrado);
-        assertEquals(livroValido.getId(), livroEncontrado.getId());
-        assertEquals(livroValido.getTitulo(), livroEncontrado.getTitulo());
-        assertEquals("J.R.R. Tolkien", livroEncontrado.getAutor());
-
-        // Verifica se o metodo findById do repositório foi chamado exatamente uma vez com o idExistente
+        // Assert
+        assertNotNull(responseDTO);
+        assertEquals(idExistente, responseDTO.getId());
+        assertEquals(livroEntidadeComId.getTitulo(), responseDTO.getTitulo());
         verify(livroRepository, times(1)).findById(idExistente);
     }
 
+
     @Test
-    @DisplayName("Deve lançar RecursoNaoEncontradoException quando ID inexistente é fornecido")
-    void buscarLivroPorId_quandoIdInexistente_lancaRecursoNaoEncontradoException() {
+    @DisplayName("Deve lançar LivroNaoEncontradoException quando ID inexistente é fornecido para busca")
+    void buscarLivroPorId_quandoIdInexistente_lancaLivroNaoEncontradoException() {
         // Arrange
         Long idInexistente = 99L;
-        String mensagemEsperada = "Livro não encontrado com ID: " + idInexistente;
-        // Configura o mock do repositório: quando findById com idInexistente for chamado,
-        // retorne um Optional vazio (simulando que o livro não foi encontrado).
         when(livroRepository.findById(idInexistente)).thenReturn(Optional.empty());
 
         // Act & Assert
-        // Verifica se a exceção RecursoNaoEncontradoException é lançada
-        // ao chamar o metodo do serviço com o idInexistente.
         LivroNaoEncontradoException exception = assertThrows(
                 LivroNaoEncontradoException.class,
                 () -> livroService.buscarLivroPorId(idInexistente)
         );
-
-        // Verifica se a mensagem da exceção é a esperada
-        assertEquals(mensagemEsperada, exception.getMessage());
-
-        // Verifica se o metodo findById do repositório foi chamado exatamente uma vez com o idInexistente
+        assertEquals("Livro não encontrado com ID: " + idInexistente, exception.getMessage());
         verify(livroRepository, times(1)).findById(idInexistente);
     }
 
-    // --- Outros testes para LivroService podem vir aqui ---
-    // Exemplo para criarLivro:
     @Test
-    @DisplayName("Deve salvar e retornar Livro quando dados válidos são fornecidos para criar")
-    void criarLivro_comDadosValidos_retornaLivroSalvo() {
+    @DisplayName("Deve retornar lista de LivroResponseDTO ao buscar todos os livros")
+    void buscarTodosLivros_retornaListaDeLivroResponseDTO() {
         // Arrange
-        // O livroValido já foi instanciado no setUp
-        // Configura o mock do repositório: quando save for chamado com qualquer instância de Livro,
-        // retorne o mesmo livro que foi passado como argumento (simulando que foi salvo).
-        // Poderíamos ser mais específicos: when(livroRepository.save(livroValido)).thenReturn(livroValido);
-        when(livroRepository.save(any(Livro.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Livro outroLivroEntidade = new Livro(2L, "1984", "George Orwell", "Distopia", 1949, "978-0451524935");
+        List<Livro> listaDeEntidades = Arrays.asList(livroEntidadeComId, outroLivroEntidade);
+        when(livroRepository.findAll()).thenReturn(listaDeEntidades);
 
         // Act
-        Livro livroSalvo = livroService.criarLivro(livroValido);
+        List<LivroResponseDTO> responseDTOList = livroService.buscarTodosLivros();
 
         // Assert
-        assertNotNull(livroSalvo);
-        assertEquals(livroValido.getTitulo(), livroSalvo.getTitulo());
-        // Se o ID é gerado no save, e o mock retorna o objeto original, o ID pode ser nulo
-        // ou o ID que você definiu no objeto 'livroValido'.
-        // Se você quer simular a geração de ID:
-        // Livro livroComIdGerado = new Livro(1L, "O Hobbit", ...);
-        // when(livroRepository.save(any(Livro.class))).thenReturn(livroComIdGerado);
+        assertNotNull(responseDTOList);
+        assertEquals(2, responseDTOList.size());
+        assertEquals(livroEntidadeComId.getTitulo(), responseDTOList.get(0).getTitulo());
+        assertEquals(outroLivroEntidade.getTitulo(), responseDTOList.get(1).getTitulo());
+        assertEquals(livroEntidadeComId.getId(), responseDTOList.get(0).getId());
+        assertEquals(outroLivroEntidade.getId(), responseDTOList.get(1).getId());
 
-        // Verifica se o metodo save do repositório foi chamado exatamente uma vez com o livroValido
-        verify(livroRepository, times(1)).save(livroValido);
+        verify(livroRepository, times(1)).findAll();
+    }
+
+
+    @Test
+    @DisplayName("Deve atualizar um livro e retornar LivroResponseDTO")
+    void atualizarLivro_comIdExistenteELivroRequestDTO_retornaLivroResponseDTO() {
+        // Arrange
+        Long idExistente = 1L;
+        // DTO com os novos dados
+        LivroRequestDTO atualizacaoRequestDTO = new LivroRequestDTO();
+        atualizacaoRequestDTO.setTitulo("O Hobbit - Edição Revisada");
+        atualizacaoRequestDTO.setAutor("J.R.R. Tolkien"); // Mesmo autor
+        atualizacaoRequestDTO.setGenero("Alta Fantasia"); // Gênero atualizado
+        atualizacaoRequestDTO.setAnoPublicacao(1937);
+        atualizacaoRequestDTO.setIsbn("978-0547928227");
+
+        // Entidade existente no banco (antes da atualização)
+        Livro livroExistenteNoBanco = new Livro(idExistente, "O Hobbit", "J.R.R. Tolkien", "Fantasia", 1937, "978-0547928227");
+
+        // Entidade como ela deve ficar após a atualização e ser salva
+        Livro livroEsperadoAposSalvar = new Livro(idExistente, atualizacaoRequestDTO.getTitulo(), atualizacaoRequestDTO.getAutor(), atualizacaoRequestDTO.getGenero(), atualizacaoRequestDTO.getAnoPublicacao(), atualizacaoRequestDTO.getIsbn());
+
+        when(livroRepository.findById(idExistente)).thenReturn(Optional.of(livroExistenteNoBanco));
+        when(livroRepository.save(any(Livro.class))).thenReturn(livroEsperadoAposSalvar); // O save retorna a entidade atualizada
+
+        // Act
+        LivroResponseDTO responseDTO = livroService.atualizarLivro(idExistente, atualizacaoRequestDTO);
+
+        // Assert
+        assertNotNull(responseDTO);
+        assertEquals(idExistente, responseDTO.getId());
+        assertEquals(atualizacaoRequestDTO.getTitulo(), responseDTO.getTitulo());
+        assertEquals(atualizacaoRequestDTO.getGenero(), responseDTO.getGenero());
+
+        // Verifica se o save foi chamado com a entidade correta (já atualizada)
+        ArgumentCaptor<Livro> livroArgumentCaptor = ArgumentCaptor.forClass(Livro.class);
+        verify(livroRepository).save(livroArgumentCaptor.capture());
+        Livro livroPassadoParaSave = livroArgumentCaptor.getValue();
+
+        assertEquals(idExistente, livroPassadoParaSave.getId()); // O ID deve ser o mesmo
+        assertEquals(atualizacaoRequestDTO.getTitulo(), livroPassadoParaSave.getTitulo());
+        assertEquals(atualizacaoRequestDTO.getGenero(), livroPassadoParaSave.getGenero());
+    }
+
+    @Test
+    @DisplayName("Deve lançar LivroNaoEncontradoException ao tentar atualizar livro com ID inexistente")
+    void atualizarLivro_quandoIdInexistente_lancaLivroNaoEncontradoException() {
+        // Arrange
+        Long idInexistente = 99L;
+        when(livroRepository.findById(idInexistente)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        LivroNaoEncontradoException exception = assertThrows(
+                LivroNaoEncontradoException.class,
+                () -> livroService.atualizarLivro(idInexistente, livroRequestDTO) // livroRequestDTO é só um placeholder aqui
+        );
+        assertEquals("Livro não encontrado com ID: " + idInexistente, exception.getMessage());
+        verify(livroRepository, times(1)).findById(idInexistente);
+        verify(livroRepository, never()).save(any(Livro.class)); // Garante que save não foi chamado
+    }
+
+
+    @Test
+    @DisplayName("Deve deletar livro quando ID existente é fornecido")
+    void deletarLivro_quandoIdExistente_naoDeveLancarExcecao() {
+        // Arrange
+        Long idExistente = 1L;
+        when(livroRepository.existsById(idExistente)).thenReturn(true);
+        // void não retorna nada, então usamos doNothing() para o mock de deleteById
+        doNothing().when(livroRepository).deleteById(idExistente);
+
+        // Act & Assert
+        assertDoesNotThrow(() -> livroService.deletarLivro(idExistente));
+
+        verify(livroRepository, times(1)).existsById(idExistente);
+        verify(livroRepository, times(1)).deleteById(idExistente);
+    }
+
+    @Test
+    @DisplayName("Deve lançar LivroNaoEncontradoException ao tentar deletar livro com ID inexistente")
+    void deletarLivro_quandoIdInexistente_lancaLivroNaoEncontradoException() {
+        // Arrange
+        Long idInexistente = 99L;
+        when(livroRepository.existsById(idInexistente)).thenReturn(false);
+
+        // Act & Assert
+        LivroNaoEncontradoException exception = assertThrows(
+                LivroNaoEncontradoException.class,
+                () -> livroService.deletarLivro(idInexistente)
+        );
+        assertEquals("Livro não encontrado com ID: " + idInexistente, exception.getMessage());
+        verify(livroRepository, times(1)).existsById(idInexistente);
+        verify(livroRepository, never()).deleteById(anyLong()); // Garante que deleteById não foi chamado
     }
 }
