@@ -33,9 +33,8 @@ public class LivroController {
     @Operation(summary = "Cria um novo livro",
             description = "Adiciona um novo livro ao sistema. O ID será gerado automaticamente.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Livro criado com sucesso",
-                    content = { @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Livro.class)) }),
+            @ApiResponse(responseCode = "201", description = "Livro criado com sucesso", content = {
+                    @Content(mediaType = "application/json", schema = @Schema(implementation = Livro.class)) }),
             @ApiResponse(responseCode = "400", description = "Dados inválidos fornecidos",
                     content = @Content) // Você pode detalhar o schema do erro 400 se quiser
     })
@@ -82,9 +81,8 @@ public class LivroController {
     // HTTP PUT para /api/livros/{id}
     @Operation(summary = "Atualiza um livro existente", description = "Atualiza os dados de um livro existente baseado no seu ID.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Livro atualizado com sucesso",
-                    content = { @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = Livro.class)) }),
+            @ApiResponse(responseCode = "200", description = "Livro atualizado com sucesso", content = {
+                    @Content(mediaType = "application/json", schema = @Schema(implementation = Livro.class))}),
             @ApiResponse(responseCode = "400", description = "Dados inválidos fornecidos"),
             @ApiResponse(responseCode = "404", description = "Livro não encontrado com o ID fornecido")
     })
