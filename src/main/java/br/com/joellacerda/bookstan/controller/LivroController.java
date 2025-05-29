@@ -11,12 +11,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController // Combina @Controller e @ResponseBody, indicando que os retornos dos métodos serão o corpo da resposta HTTP
 @RequestMapping("/api/livros") // Define o caminho base para todos os endpoints neste controller
@@ -50,16 +50,21 @@ public class LivroController {
 
     // Endpoint para BUSCAR todos os livros
     // HTTP GET para /api/livros
-    @Operation(summary = "Lista todos os livros", description = "Retorna uma lista de todos os livros cadastrados.")
+    @Operation(summary = "Lista todos os livros de forma paginada e ordenada",
+            description = "Retorna uma página de livros cadastrados. " +
+                    "Você pode controlar a paginação e ordenação através de query params: " +
+                    "`page` (número da página, começando em 0), " +
+                    "`size` (tamanho da página), e " +
+                    "`sort` (ex: `titulo,asc` ou `autor,desc`).")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de livros recuperada com sucesso",
                     content = { @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = LivroResponseDTO.class)) }) // Indica que retorna uma lista de Livro
+                            schema = @Schema(implementation = Page.class)) })
     })
     @GetMapping
-    public ResponseEntity<List<LivroResponseDTO>> buscarTodosLivros() {
-        List<LivroResponseDTO> livros = livroService.buscarTodosLivros();
-        return ResponseEntity.ok(livros);
+    public ResponseEntity<Page<LivroResponseDTO>> buscarTodosLivros(Pageable pageable) {
+            Page<LivroResponseDTO> livrosPaginados = livroService.buscarTodosLivros(pageable);
+            return ResponseEntity.ok(livrosPaginados);
     }
 
     // Endpoint para BUSCAR um livro por ID

@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.*;
 
 import java.util.Arrays;
 import java.util.List;
@@ -126,25 +127,32 @@ public class LivroServiceTest {
     }
 
     @Test
-    @DisplayName("Deve retornar lista de LivroResponseDTO ao buscar todos os livros")
-    void buscarTodosLivros_retornaListaDeLivroResponseDTO() {
+    @DisplayName("Deve retornar Page de LivroResponseDTO ao buscar todos os livros com paginação")
+    void buscarTodosLivros_comPageable_retornaPageDeLivroResponseDTO() {
         // Arrange
         Livro outroLivroEntidade = new Livro(2L, "1984", "George Orwell", "Distopia", 1949, "978-0451524935");
         List<Livro> listaDeEntidades = Arrays.asList(livroEntidadeComId, outroLivroEntidade);
-        when(livroRepository.findAll()).thenReturn(listaDeEntidades);
+        // Define o Pageable que seria passado para o serviço
+        Pageable pageable = PageRequest.of(0, 5, Sort.by("titulo").ascending());
+        // Cria um objeto Page<Livro> para ser retornado pelo mock do repositório
+        // Parâmetros: conteúdo da página, pageable da requisição, total de elementos no banco
+        Page<Livro> paginaDeEntidadesMock = new PageImpl<>(listaDeEntidades, pageable, listaDeEntidades.size());
+        // Configura o mock do repositório
+        when(livroRepository.findAll(pageable)).thenReturn(paginaDeEntidadesMock);
 
         // Act
-        List<LivroResponseDTO> responseDTOList = livroService.buscarTodosLivros();
+        Page<LivroResponseDTO> resultPage = livroService.buscarTodosLivros(pageable);
 
         // Assert
-        assertNotNull(responseDTOList);
-        assertEquals(2, responseDTOList.size());
-        assertEquals(livroEntidadeComId.getTitulo(), responseDTOList.get(0).getTitulo());
-        assertEquals(outroLivroEntidade.getTitulo(), responseDTOList.get(1).getTitulo());
-        assertEquals(livroEntidadeComId.getId(), responseDTOList.get(0).getId());
-        assertEquals(outroLivroEntidade.getId(), responseDTOList.get(1).getId());
+        assertNotNull(resultPage);
+        assertEquals(2, resultPage.getTotalElements(), "Total de elementos deve ser 2");
+        assertEquals(1, resultPage.getTotalPages(), "Total de páginas deve ser 1 para 2 elementos com size 5");
+        assertEquals(0, resultPage.getNumber(), "Número da página atual deve ser 0");
+        assertEquals(2, resultPage.getContent().size(), "Conteúdo da página deve ter 2 livros");
+        assertEquals(livroEntidadeComId.getTitulo(), resultPage.getContent().get(0).getTitulo());
+        assertEquals(outroLivroEntidade.getTitulo(), resultPage.getContent().get(1).getTitulo());
 
-        verify(livroRepository, times(1)).findAll();
+        verify(livroRepository, times(1)).findAll(pageable);
     }
 
 

@@ -6,11 +6,10 @@ import br.com.joellacerda.bookstan.model.Livro;
 import br.com.joellacerda.bookstan.repository.LivroRepository;
 import br.com.joellacerda.bookstan.exception.LivroNaoEncontradoException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service // Indica ao Spring que esta classe é um componente de serviço
 public class LivroService {
@@ -58,11 +57,10 @@ public class LivroService {
 
     // Metodo para BUSCAR todos os livros
     @Transactional(readOnly = true)
-    public List<LivroResponseDTO> buscarTodosLivros() {
-        return livroRepository.findAll()
-                .stream()
-                .map(this::toResponseDTO) // Equivalente a .map(livro -> toResponseDTO(livro))
-                .collect(Collectors.toList());
+    public Page<LivroResponseDTO> buscarTodosLivros(Pageable pageable) {
+        Page<Livro> paginaDeLivrosEntidade = livroRepository.findAll(pageable);
+        // O objeto Page tem um metodo .map() que facilita a conversão do conteúdo da página
+        return paginaDeLivrosEntidade.map(this::toResponseDTO); // Mapeia cada Livro para LivroResponseDTO
     }
 
     // Metodo para BUSCAR um livro por ID

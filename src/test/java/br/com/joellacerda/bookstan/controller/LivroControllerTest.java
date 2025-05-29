@@ -15,13 +15,15 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest // Carrega o contexto completo da aplicação Spring Boot para o teste
 @AutoConfigureMockMvc // Configura automaticamente o MockMvc
-@ActiveProfiles("test") // Opcional: Ativa um perfil "test" se você tiver um application-test.properties
+//@ActiveProfiles("test") // Opcional: Ativa um perfil "test" se você tiver um application-test.properties
                         // Útil para, por exemplo, garantir que está usando H2
 @Transactional // Garante que cada teste rode em sua própria transação, que é revertida ao final.
                // Isso ajuda a manter o estado do banco de dados limpo entre os testes.
@@ -38,6 +40,7 @@ public class LivroControllerTest {
 
     private Livro livroExemplo1;
     private Livro livroExemplo2;
+    private Livro livroExemplo3;
 
     // Para requisições, usaremos LivroRequestDTO
     private LivroRequestDTO livroRequestExemplo;
@@ -52,6 +55,7 @@ public class LivroControllerTest {
         // Configura alguns livros de exemplo
         livroExemplo1 = new Livro(null, "A Revolução dos Bichos", "George Orwell", "Sátira Política", 1945, "978-8535902776");
         livroExemplo2 = new Livro(null, "1984", "George Orwell", "Distopia", 1949, "978-0451524935");
+        livroExemplo3 = new Livro(null, "O Hobbit", "J.R.R. Tolkien", "Fantasia", 1937, "978-0547928227");
 
         // DTO para usar nas requisições POST/PUT
         livroRequestExemplo = new LivroRequestDTO();
@@ -131,19 +135,66 @@ public class LivroControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/livros - Deve retornar lista de livros e status 200")
-    void buscarTodosLivros_retornaListaDeLivrosComStatus200() throws Exception {
-        // Arrange: Salva alguns livros
-        livroRepository.save(livroExemplo1);
-        livroRepository.save(livroExemplo2);
+    @DisplayName("GET /api/livros -  Deve retornar primeira página de livros ordenada por título ASC e status 200")
+    void buscarTodosLivros_comPaginacaoEOrdenacaoPorTituloAsc_retornaPrimeiraPaginaComStatus200() throws Exception {
+        // Arrange
+        livroRepository.saveAll(Arrays.asList(livroExemplo1, livroExemplo2, livroExemplo3));
 
         // Act & Assert
         mockMvc.perform(get("/api/livros")
+                        .param("page", "0")        // Primeira página
+                        .param("size", "2")        // Dois livros por página
+                        .param("sort", "titulo,asc") // Ordenar por título, ascendente
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].titulo", is(livroExemplo1.getTitulo())))
-                .andExpect(jsonPath("$[1].titulo", is(livroExemplo2.getTitulo())));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content", hasSize(2))) // Espera 2 livros nesta página
+                .andExpect(jsonPath("$.content[0].titulo", is("1984"))) // "1984" vem antes de "A Revolução dos Bichos"
+                .andExpect(jsonPath("$.content[1].titulo", is("A Revolução dos Bichos")))
+                .andExpect(jsonPath("$.totalElements", is(3))) // Total de 3 livros no banco
+                .andExpect(jsonPath("$.totalPages", is(2)))    // 3 livros / 2 por página = 2 páginas
+                .andExpect(jsonPath("$.number", is(0)))       // Página atual é a 0
+                .andExpect(jsonPath("$.size", is(2)));        // Tamanho da página é 2
+    }
+
+    @Test
+    @DisplayName("GET /api/livros -  Deve retornar segunda página de livros ordenada por título ASC e status 200")
+    void buscarTodosLivros_comPaginacaoEOrdenacaoPorTituloAsc_retornaSegundaPaginaComStatus200() throws Exception {
+        // Arrange
+        livroRepository.saveAll(Arrays.asList(livroExemplo1, livroExemplo2, livroExemplo3));
+
+        // Act & Assert
+        mockMvc.perform(get("/api/livros")
+                        .param("page", "1")        // Segunda página
+                        .param("size", "2")        // Dois livros por página
+                        .param("sort", "titulo,asc") // Ordenar por título, ascendente
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content", hasSize(1))) // Apenas 1 livro na segunda página
+                .andExpect(jsonPath("$.content[0].titulo", is("O Hobbit"))) // O último livro ordenado
+                .andExpect(jsonPath("$.totalElements", is(3)))
+                .andExpect(jsonPath("$.totalPages", is(2)))
+                .andExpect(jsonPath("$.number", is(1)));      // Página atual é a 1
+    }
+
+    @Test
+    @DisplayName("GET /api/livros - Deve usar paginação padrão se nenhum parâmetro for fornecido")
+    void buscarTodosLivros_semParametrosDePaginacao_usaPaginacaoPadrao() throws Exception {
+        // Arrange
+        livroRepository.saveAll(Arrays.asList(livroExemplo1, livroExemplo2, livroExemplo3));
+
+        // Act & Assert
+        // Spring Data Pageable padrão: page=0, size=20
+        // Como temos 3 livros, todos devem vir na primeira página padrão.
+        mockMvc.perform(get("/api/livros")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(3)))
+                .andExpect(jsonPath("$.totalElements", is(3)))
+                .andExpect(jsonPath("$.totalPages", is(1))) // Todos cabem em uma página de tamanho 20
+                .andExpect(jsonPath("$.number", is(0)))
+                .andExpect(jsonPath("$.size", is(20))); // Tamanho padrão da página
     }
 
     @Test
@@ -233,7 +284,7 @@ public class LivroControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    @Test
+       @Test
     @DisplayName("DELETE /api/livros/{id} - Deve retornar status 404 quando ID inexistente")
     void deletarLivro_quandoIdInexistente_retornaStatus404() throws Exception {
         // Arrange
